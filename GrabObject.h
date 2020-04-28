@@ -25,7 +25,7 @@ protected:
 	virtual void BeginPlay() override;
 
 private:
-	float PlayerReach = 150.f;
+	float PlayerReachDistance = 150.f;
 		
 	void FindPhysicsHandle();
 	void SetUpInputComponent();
@@ -35,7 +35,9 @@ private:
 	// Return the first actor with a physics body within player reach
 	FHitResult GetFirstPhysicsBodyInReach() const;
 
-	FVector GetLineTraceEnd();
+	FVector GetPlayerLocation() const;
+	FRotator GetPlayerRotation() const;
+	FVector GetPlayerReach() const;
 	
 	UPhysicsHandleComponent* PhysicsHandle = nullptr;
 	UInputComponent* InputComponent = nullptr;
