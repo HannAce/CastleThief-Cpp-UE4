@@ -8,8 +8,7 @@
 #define OUT
 
 // Sets default values for this component's properties
-UGrabObject::UGrabObject()
-{
+UGrabObject::UGrabObject() {
 	// Set this component to be initialized when the game starts, and to be ticked every frame.  You can turn these features
 	// off to improve performance if you don't need them.
 	PrimaryComponentTick.bCanEverTick = true;
@@ -43,9 +42,7 @@ void UGrabObject::SetUpInputComponent() {
 	}
 }
 
-// Function to pick up object
-void UGrabObject::Grab() {
-	UE_LOG(LogTemp, Warning, TEXT("Grabber pressed"));
+FVector UGrabObject::GetPlayerLocation() const {
 
 	FVector ViewpointLocation;
 	FRotator ViewpointRotation;
@@ -53,56 +50,50 @@ void UGrabObject::Grab() {
 	GetWorld()->GetFirstPlayerController()->GetPlayerViewPoint(
 		OUT ViewpointLocation, OUT ViewpointRotation);
 
-	FVector LineTraceEnd = ViewpointLocation + ViewpointRotation.Vector() * PlayerReach;
+	return ViewpointLocation;
+}
 
+FRotator UGrabObject::GetPlayerRotation() const {
+
+	FVector ViewpointLocation;
+	FRotator ViewpointRotation;
+
+	GetWorld()->GetFirstPlayerController()->GetPlayerViewPoint(
+		OUT ViewpointLocation, OUT ViewpointRotation);
+
+	return ViewpointRotation;
+}
+
+FVector UGrabObject::GetPlayerReach() const {
+
+	return GetPlayerLocation() + GetPlayerRotation().Vector() * PlayerReachDistance;
+}
+
+// Function to pick up object
+void UGrabObject::Grab() {
 	FHitResult HitResult = GetFirstPhysicsBodyInReach();
 	UPrimitiveComponent* ComponentToGrab = HitResult.GetComponent();
 
 	// If something is hit, attach physics handle
 	if (HitResult.GetActor()) {
-		PhysicsHandle->GrabComponentAtLocationWithRotation(ComponentToGrab, NAME_None, LineTraceEnd, ViewpointRotation);
+		PhysicsHandle->GrabComponentAtLocationWithRotation(ComponentToGrab, NAME_None, GetPlayerReach(),
+			GetPlayerRotation());
 	}
 }
 
 // Function to release object
 void UGrabObject::ReleaseGrab() {
-	UE_LOG(LogTemp, Warning, TEXT("Grab released"));
 	PhysicsHandle->ReleaseComponent();
-}
-
-// Called every frame
-void UGrabObject::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
-{
-	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-
-	FVector ViewpointLocation;
-	FRotator ViewpointRotation;
-
-	GetWorld()->GetFirstPlayerController()->GetPlayerViewPoint(
-		OUT ViewpointLocation, OUT ViewpointRotation);
-
-	FVector LineTraceEnd = ViewpointLocation + ViewpointRotation.Vector() * PlayerReach;
-
-	if (PhysicsHandle->GrabbedComponent) { 
-		PhysicsHandle->SetTargetLocation(LineTraceEnd);
-		}
 }
 
 // Return the first actor with a physics body within player reach
 FHitResult UGrabObject::GetFirstPhysicsBodyInReach() const {
-	FVector ViewpointLocation;
-	FRotator ViewpointRotation;
-
-	GetWorld()->GetFirstPlayerController()->GetPlayerViewPoint(
-		OUT ViewpointLocation, OUT ViewpointRotation);
-
-	FVector LineTraceEnd = ViewpointLocation + ViewpointRotation.Vector() * PlayerReach;
 
 	// Ray-cast out to a certain distance
 	FHitResult Hit;
 	FCollisionQueryParams TraceParams(FName(TEXT("")), false, GetOwner());
 
-	GetWorld()->LineTraceSingleByObjectType(OUT Hit, ViewpointLocation, LineTraceEnd,
+	GetWorld()->LineTraceSingleByObjectType(OUT Hit, GetPlayerLocation(), GetPlayerReach(),
 		FCollisionObjectQueryParams(ECollisionChannel::ECC_PhysicsBody), TraceParams);
 
 	// Check what object is hit
@@ -114,15 +105,13 @@ FHitResult UGrabObject::GetFirstPhysicsBodyInReach() const {
 	return Hit;
 }
 
-/*FVector UGrabObject::GetLineTraceEnd() {
-	FVector ViewpointLocation;
-	FRotator ViewpointRotation;
+// Called every frame
+void UGrabObject::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+{
+	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	GetWorld()->GetFirstPlayerController()->GetPlayerViewPoint(
-		OUT ViewpointLocation, OUT ViewpointRotation);
-
-	FVector LineTraceEnd = ViewpointLocation + ViewpointRotation.Vector() * PlayerReach;
-
-	return LineTraceEnd;
-}*/
+	if (PhysicsHandle->GrabbedComponent) { 
+		PhysicsHandle->SetTargetLocation(GetPlayerReach());
+		}
+}
 
