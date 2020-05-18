@@ -55,9 +55,6 @@ private:
 		float DoorCloseDelay = 0.3f;
 
 	UPROPERTY(EditAnywhere)
-		float DoorOpenMass = 50.f;
-
-	UPROPERTY(EditAnywhere)
 		ATriggerVolume* PressurePlate = nullptr;
 	
 	UPROPERTY()

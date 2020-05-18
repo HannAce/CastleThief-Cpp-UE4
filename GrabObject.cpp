@@ -25,7 +25,7 @@ void UGrabObject::BeginPlay() {
 // Check for PhysicsHandle Component
 void UGrabObject::FindPhysicsHandle() {
 	PhysicsHandle = GetOwner()->FindComponentByClass<UPhysicsHandleComponent>();
-	if (!PhysicsHandle) {
+	if (!PhysicsHandle) { // Safety net to avoid potential errors/crashes if pointer returns null
 		UE_LOG(LogTemp, Error, TEXT("No Physics Handle component found on %s!"), *GetOwner()->GetName());
 	}
 }
@@ -42,6 +42,7 @@ void UGrabObject::SetUpInputComponent() {
 	}
 }
 
+// Gets the player's location
 FVector UGrabObject::GetPlayerLocation() const {
 
 	FVector ViewpointLocation;
@@ -49,10 +50,13 @@ FVector UGrabObject::GetPlayerLocation() const {
 
 	GetWorld()->GetFirstPlayerController()->GetPlayerViewPoint(
 		OUT ViewpointLocation, OUT ViewpointRotation);
+	// DrawDebugSphere(GetWorld(), ViewpointLocation, 5, 16, FColor::Cyan, false, 1, 0, 1);
+
 
 	return ViewpointLocation;
 }
 
+// Gets the player's rotation
 FRotator UGrabObject::GetPlayerRotation() const {
 
 	FVector ViewpointLocation;
@@ -64,52 +68,68 @@ FRotator UGrabObject::GetPlayerRotation() const {
 	return ViewpointRotation;
 }
 
+// Raycast gets the distance the player can reach to pick up an object
 FVector UGrabObject::GetPlayerReach() const {
-
-	return GetPlayerLocation() + GetPlayerRotation().Vector() * PlayerReachDistance;
+	FVector ReachLocation = GetPlayerLocation() + (GetPlayerRotation().RotateVector(FVector::ForwardVector)	* PlayerReachDistance);
+	return ReachLocation;
 }
 
-// Function to pick up object
+// Function to pick up an object
 void UGrabObject::Grab() {
-	FHitResult HitResult = GetFirstPhysicsBodyInReach();
+	FHitResult HitResult;
+	bool Success = GetFirstPhysicsBodyInReach(HitResult);
 	UPrimitiveComponent* ComponentToGrab = HitResult.GetComponent();
+	if (Success)
+	{
+		AActor* ActorHit = HitResult.GetActor();
 
-	// If something is hit, attach physics handle
-	if (HitResult.GetActor()) {
-		PhysicsHandle->GrabComponentAtLocationWithRotation(ComponentToGrab, NAME_None, GetPlayerReach(),
-			GetPlayerRotation());
+		// If something is hit, attach physics handle
+		if (ActorHit) {
+			if (!PhysicsHandle) { // Safety net to avoid potential errors/crashes if pointer returns null
+				return;
+			}
+			PhysicsHandle->GrabComponentAtLocationWithRotation(ComponentToGrab, NAME_None, GetPlayerReach(),
+				GetPlayerRotation());
+		}
 	}
 }
 
-// Function to release object
+// Function to release a held object
 void UGrabObject::ReleaseGrab() {
+	if (!PhysicsHandle) { // Safety net to avoid potential errors/crashes if pointer returns null
+		return;
+	}
 	PhysicsHandle->ReleaseComponent();
 }
 
 // Return the first actor with a physics body within player reach
-FHitResult UGrabObject::GetFirstPhysicsBodyInReach() const {
+bool UGrabObject::GetFirstPhysicsBodyInReach(FHitResult& Hit) const {
 
 	// Ray-cast out to a certain distance
-	FHitResult Hit;
 	FCollisionQueryParams TraceParams(FName(TEXT("")), false, GetOwner());
 
-	GetWorld()->LineTraceSingleByObjectType(OUT Hit, GetPlayerLocation(), GetPlayerReach(),
-		FCollisionObjectQueryParams(ECollisionChannel::ECC_PhysicsBody), TraceParams);
+	bool Success = GetWorld()->LineTraceSingleByObjectType(OUT Hit, GetPlayerLocation(), GetPlayerReach(),
+	FCollisionObjectQueryParams(ECollisionChannel::ECC_PhysicsBody), TraceParams);
 
 	// Check what object is hit
-	AActor* ActorHit = Hit.GetActor();
-	if (ActorHit) {
-		UE_LOG(LogTemp, Warning, TEXT("Line Trace has hit %s"), *(ActorHit->GetName()));
+	if (Success) {
+		AActor* ActorHit = Hit.GetActor();
+		if (ActorHit) {
+			UE_LOG(LogTemp, Warning, TEXT("Line Trace has hit %s"), *(ActorHit->GetName()));
+		}
 	}
 
-	return Hit;
+	return Success;
 }
 
 // Called every frame
 void UGrabObject::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-
+	if (!PhysicsHandle) { // Safety net to avoid potential errors/crashes if pointer returns null
+		UE_LOG(LogTemp, Error, TEXT("No Physics Handle"));
+		return;
+	}
 	if (PhysicsHandle->GrabbedComponent) { 
 		PhysicsHandle->SetTargetLocation(GetPlayerReach());
 		}
